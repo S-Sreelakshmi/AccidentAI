@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AccidentAI - Emergency App</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Screen 1: Standby -->
+        <div id="standbyScreen" class="screen active">
+            <!-- Subtle Ambient Background Light -->
+            <div class="ambient-light"></div>
+
+            <!-- Protection Status Pill -->
+            <header class="status-header">
+                <div class="status-pill">
+                    <div class="pulse-dot"></div>
+                    <span>Protection active</span>
+                </div>
+            </header>
+
+            <!-- Offline Banner -->
+            <div id="offlineBanner" class="offline-banner">
+                <i data-lucide="wifi-off"></i>
+                <span>No internet — SMS mode active</span>
+            </div>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="sos-wrapper">
+                    <!-- Pulsing Rings -->
+                    <div class="ring ring-1"></div>
+                    <div class="ring ring-2"></div>
+                    <div class="ring ring-3"></div>
+                    
+                    <!-- Progress Ring for Hold -->
+                    <svg class="progress-ring" width="220" height="220">
+                        <circle class="progress-ring__circle" stroke="rgba(255,255,255,0.9)" stroke-width="6" fill="transparent" r="102" cx="110" cy="110"/>
+                    </svg>
+                    
+                    <!-- SOS Button -->
+                    <button class="sos-button" id="sosButton">
+                        <span>SOS</span>
+                    </button>
+                </div>
+                <p class="instruction-text">Hold 3 seconds to trigger manually</p>
+                <button id="manualSmsBtn" class="btn-sms-fallback">
+                    <i data-lucide="message-square"></i> Send SMS manually
+                </button>
+                <p class="simulate-instruction" id="simulateCrashBtn">Simulate Auto-Crash</p>
+                <p class="simulate-instruction" id="simulateOfflineBtn" style="margin-top: 10px; color: #D97706;">Toggle Offline Mode</p>
+                <p class="simulate-instruction" id="openScannerBtn" style="margin-top: 10px; color: #71717A;">Test OCR Scanner</p>
+            </main>
+
+            <!-- Bottom Tab Bar -->
+            <nav class="bottom-nav">
+                <a href="#" class="nav-item active">
+                    <i data-lucide="shield"></i>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-item" id="navNearby">
+                    <i data-lucide="map-pin"></i>
+                    <span>Nearby</span>
+                </a>
+                <a href="#" class="nav-item" id="navProfile">
+                    <i data-lucide="user"></i>
+                    <span>Profile</span>
+                </a>
+                <a href="#" class="nav-item" id="navHistory">
+                    <i data-lucide="history"></i>
+                    <span>History</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Screen 5: Medical ID Profile -->
+        <div id="medicalIdScreen" class="screen">
+            <div class="screen-header">
+                <button class="icon-button" id="closeProfileBtn">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <h2 class="screen-title">Medical ID</h2>
+            </div>
+            
+            <div class="scroll-content">
+                <form id="medicalIdForm" class="medical-id-form">
+                    <div class="form-section">
+                        <label>Personal Information</label>
+                        <input type="text" id="profName" name="name" placeholder="Full Name" class="styled-input">
+                        <div class="input-row">
+                            <input type="number" id="profAge" name="age" placeholder="Age" class="styled-input">
+                            <select id="profBlood" name="bloodGroup" class="styled-input">
+                                <option value="" disabled selected>Blood Group</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <label>Medical History</label>
+                        <textarea id="profAllergies" name="allergies" placeholder="Known Allergies (e.g. Penicillin)" class="styled-input"></textarea>
+                        <textarea id="profConditions" name="conditions" placeholder="Medical Conditions (e.g. Asthma, Diabetes)" class="styled-input"></textarea>
+                    </div>
+
+                    <div class="form-section">
+                        <label>Emergency Contact</label>
+                        <input type="text" id="profContactName" name="contactName" placeholder="Contact Person Name" class="styled-input">
+                        <input type="tel" id="profContactPhone" name="contactPhone" placeholder="Emergency Phone Number" class="styled-input">
+                    </div>
+
+                    <div class="qr-container">
+                        <p class="qr-label">Scan without unlocking phone</p>
+                        <div id="qrcode"></div>
+                    </div>
+
+                    <button type="submit" class="btn-save-profile" id="saveProfileBtn">
+                        <span id="saveBtnText">Save Profile</span>
+                        <i data-lucide="check" id="saveCheckIcon" style="display: none;"></i>
+                    </button>
+                    <p class="save-hint">Data is saved locally for offline first-responders.</p>
+                </form>
+            </div>
+        </div>
+
+        <!-- Screen 6: Incident History -->
+        <div id="historyScreen" class="screen">
+            <div class="screen-header">
+                <button class="icon-button" id="closeHistoryBtn">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <h2 class="screen-title">Incident History</h2>
+            </div>
+            
+            <div class="scroll-content" id="historyListContainer">
+                <!-- Empty State -->
+                <div class="empty-state" id="historyEmptyState">
+                    <div class="empty-shield">
+                        <i data-lucide="shield-off"></i>
+                    </div>
+                    <h3>No incidents recorded</h3>
+                    <p>Your emergency event history will appear here.</p>
+                </div>
+
+                <!-- History List -->
+                <div class="history-list" id="historyList"></div>
+            </div>
+        </div>
+
+        <!-- Screen 2: Crash Detected / Countdown -->
+        <div id="crashScreen" class="screen">
+            <!-- Location Banner -->
+            <div class="location-banner">
+                <i data-lucide="map-pin"></i>
+                <div class="location-text">
+                    <span class="location-label">DETECTED LOCATION</span>
+                    <span class="location-value">NH 66, Kozhikode Bypass, Kerala</span>
+                </div>
+            </div>
+
+            <!-- Countdown Timer -->
+            <div class="countdown-wrapper">
+                <div class="pulse-layer"></div>
+                <div class="timer-circle">
+                    <svg class="countdown-svg" width="260" height="260">
+                        <circle class="countdown-track" cx="130" cy="130" r="120"></circle>
+                        <circle class="countdown-progress" cx="130" cy="130" r="120" id="countdownCircle"></circle>
+                    </svg>
+                    <span class="countdown-number" id="countdownTimer">10</span>
+                </div>
+            </div>
+
+            <!-- Caution text -->
+            <div class="crash-text-container">
+                <h2 class="crash-heading">CRASH DETECTED</h2>
+                <div class="triage-status">
+                    <span class="triage-pill" id="triageGforce">IMPACT: --G</span>
+                    <span class="triage-pill" id="triageOrientation">ORIENTATION: --</span>
+                </div>
+                <p class="crash-subtext"><span id="sendingModeText">Sending SOS</span> in <span id="countdownText">10</span> seconds.</p>
+            </div>
+
+            <!-- Actions -->
+            <div class="crash-actions">
+                <button class="btn-cancel" id="cancelSosBtn">
+                    I'm Safe &mdash; Cancel
+                </button>
+                <button class="btn-send" id="sendSosBtn">
+                    Send Now
+                </button>
+            </div>
+            </div>
+        </div>
+
+        <!-- Screen 4: Nearby Map (Hospitals + Police) -->
+        <div id="mapScreen" class="screen">
+            <!-- Header for Map -->
+            <div class="map-header">
+                <button class="icon-button" id="closeMapBtn">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <div class="map-header-text">
+                    <span class="map-title">Nearby Emergency</span>
+                    <span class="map-subtitle" id="hospCountText">Searching...</span>
+                </div>
+            </div>
+
+            <!-- Filter Chips -->
+            <div class="map-filter-bar" id="mapFilterBar">
+                <button class="filter-chip active" data-filter="all" id="filterAll">
+                    <i data-lucide="layout-grid"></i> All
+                </button>
+                <button class="filter-chip" data-filter="govt" id="filterGovt">
+                    <i data-lucide="landmark"></i> Government
+                </button>
+                <button class="filter-chip" data-filter="private" id="filterPrivate">
+                    <i data-lucide="building-2"></i> Private
+                </button>
+                <button class="filter-chip" data-filter="trauma" id="filterTrauma">
+                    <i data-lucide="siren"></i> Trauma
+                </button>
+                <button class="filter-chip filter-chip--police" data-filter="police" id="filterPolice">
+                    <i data-lucide="shield-alert"></i> Police
+                </button>
+                <button class="filter-chip filter-chip--fuel" data-filter="fuel" id="filterFuel">
+                    <i data-lucide="fuel"></i> Fuel
+                </button>
+
+                <button class="filter-chip filter-chip--towing" data-filter="towing" id="filterTowing">
+                    <i data-lucide="truck"></i> Towing
+                </button>
+            </div>
+
+            <!-- Map Container -->
+            <div id="map"></div>
+
+            <!-- Unified Detail Bottom Sheet -->
+            <div class="hosp-card" id="hospCard">
+                <!-- Handle -->
+                <div class="bottom-sheet-handle"></div>
+                <!-- Type Badge -->
+                <div class="bs-type-badge" id="bsTypeBadge">Government Hospital</div>
+                <!-- Name & Meta -->
+                <h3 class="bs-name" id="hospName">Hospital Name</h3>
+                <div class="bs-meta-row">
+                    <span class="bs-meta-item" id="hospDist">
+                        <i data-lucide="map-pin"></i> 0.0 km
+                    </span>
+                    <span class="bs-meta-item" id="bsDriveTime">
+                        <i data-lucide="clock"></i> ~0 min
+                    </span>
+                    <span class="bs-meta-item" id="bsPhone" style="display:none">
+                        <i data-lucide="phone"></i> N/A
+                    </span>
+                    <span class="bs-meta-item" id="bsBeds" style="display:none">
+                        <i data-lucide="bed-double"></i> <span id="bedsCount"></span>
+                    </span>
+                </div>
+                <!-- Action Buttons -->
+                <div class="bs-actions">
+                    <button class="bs-btn bs-btn--navigate" id="bsNavigateBtn">
+                        <i data-lucide="navigation"></i> Navigate
+                    </button>
+                    <button class="bs-btn bs-btn--call" id="bsCallBtn">
+                        <i data-lucide="phone"></i> Call 104
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 3: Scene Scanner -->
+        <div id="scannerScreen" class="screen">
+            <!-- Top Controls -->
+            <div class="scanner-header">
+                <button class="icon-button" id="closeScannerBtn">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <span class="scanner-title">OCR Scene Scanner</span>
+                <div style="width: 40px"></div> <!-- Spacer -->
+            </div>
+
+            <!-- Viewfinder -->
+            <div class="viewfinder-container">
+                <video id="cameraStream" autoplay playsinline muted></video>
+                <!-- Grid / Camera sim overlay -->
+                <div class="camera-feed"></div>
+                
+                <div class="scan-frame">
+                    <div class="corner top-left"></div>
+                    <div class="corner top-right"></div>
+                    <div class="corner bottom-left"></div>
+                    <div class="corner bottom-right"></div>
+                    
+                    <div class="scan-laser" id="scanLaser"></div>
+                </div>
+                <button class="scan-btn" id="captureScanBtn">
+                    <i data-lucide="scan"></i> Scan Plate
+                </button>
+            </div>
+
+            <!-- Bottom Card -->
+            <div class="details-card" id="detailsCard">
+                <div class="card-handle"></div>
+                <!-- Data fields -->
+                <div class="data-group">
+                    <div class="data-item" id="vehicleDataItem">
+                        <i data-lucide="car"></i>
+                        <div class="data-content">
+                            <span class="data-label">Vehicle</span>
+                            <span class="data-val" id="vehicleDataVal">Awaiting scan...</span>
+                        </div>
+                    </div>
+                    <div class="data-item" id="ownerDataItem">
+                        <i data-lucide="user"></i>
+                        <div class="data-content">
+                            <span class="data-label">Registered owner</span>
+                            <span class="data-val" id="ownerDataVal">Awaiting scan...</span>
+                        </div>
+                    </div>
+                    <div class="data-item" id="insuranceDataItem">
+                        <i data-lucide="file-check"></i>
+                        <div class="data-content">
+                            <span class="data-label">Insurance</span>
+                            <span class="data-val" id="insuranceDataVal">Awaiting scan...</span>
+                        </div>
+                    </div>
+                    <div class="data-item" id="rcStatusDataItem">
+                        <i data-lucide="shield-check"></i>
+                        <div class="data-content">
+                            <span class="data-label">RC Status</span>
+                            <span class="data-val" id="rcStatusDataVal">Awaiting scan...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn-confirm">
+                    Confirm and include in report
+                </button>
+                <button class="btn-outline" id="rescanCardBtn">
+                    <i data-lucide="refresh-cw"></i> Scan again
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
