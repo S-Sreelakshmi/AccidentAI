@@ -397,6 +397,34 @@ function cancelAutoCrash() {
     saveIncident(cancelData);
 }
 
+function showConfirmationBanner(targetName) {
+    // Remove existing banners if any are already present
+    document.querySelectorAll('.notification-banner').forEach(el => el.remove());
+
+    const banner = document.createElement('div');
+    banner.className = 'notification-banner';
+    banner.innerHTML = `
+        <i data-lucide="check-circle"></i>
+        <span>SOS sent to ${targetName}</span>
+    `;
+
+    const container = document.querySelector('.app-container');
+    if (container) {
+        container.appendChild(banner);
+        lucide.createIcons();
+        setTimeout(() => {
+            banner.classList.add('show');
+        }, 50);
+
+        setTimeout(() => {
+            banner.classList.remove('show');
+            setTimeout(() => {
+                banner.remove();
+            }, 500);
+        }, 4000);
+    }
+}
+
 function executeAutoSOS() {
     // Stop any running countdown immediately to prevent double-logging
     clearInterval(autoCrashTimer);
@@ -431,24 +459,55 @@ function executeAutoSOS() {
     
     if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
     
-    if (!navigator.onLine || isSimulatedOffline) {
-        let locationStr = (latestLat === "Unknown") ? "Location unavailable" : `${latestLat.toFixed(5)}, ${latestLng.toFixed(5)}`;
-        const messageBody = `ACCIDENT ALERT: I need help. Sent via AccidentAI ${locationStr}`;
-        const delimiter = /iPad|iPhone|iPod/.test(navigator.userAgent) ? '&' : '?';
-        const uri = `sms:112${delimiter}body=${encodeURIComponent(messageBody)}`;
-        
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-            const a = document.createElement('a');
-            a.href = uri;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } else {
-            console.log("Desktop test SMS Intent:", uri);
+    // Get profile data for SMS sending
+    const savedData = localStorage.getItem('medicalId');
+    let contactPhone = "112";
+    let contactName = "";
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            if (data.contactPhone && data.contactPhone.trim() !== "") {
+                contactPhone = data.contactPhone.trim();
+            }
+            if (data.contactName && data.contactName.trim() !== "") {
+                contactName = data.contactName.trim();
+            }
+        } catch (e) {
+            console.warn("Failed to parse medicalId from localStorage", e);
         }
     }
+
+    // Format coordinates and timestamp
+    const latLongStr = (typeof latestLat === 'number' && typeof latestLng === 'number') 
+        ? `${latestLat.toFixed(6)}, ${latestLng.toFixed(6)}` 
+        : 'Unknown';
+    const timestamp = new Date().toLocaleString();
+
+    // Construct precise SMS content
+    const messageBody = `🚨 ACCIDENT ALERT from AccidentAI: I have been in a crash and need immediate help. My location: [${latLongStr}]. Time: [${timestamp}]. Please call emergency services or contact me immediately.`;
+    
+    const delimiter = /iPad|iPhone|iPod/.test(navigator.userAgent) ? '&' : '?';
+    const uri = `sms:${contactPhone}${delimiter}body=${encodeURIComponent(messageBody)}`;
+    
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        const a = document.createElement('a');
+        a.href = uri;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } else {
+        console.log("Desktop test SMS Intent:", uri);
+        // Copy to clipboard for testing fallback on desktop
+        navigator.clipboard.writeText(messageBody).then(() => {
+            console.log("SMS copied to clipboard (Desktop test mode)");
+        }).catch(() => {});
+    }
+
+    // Show a confirmation banner "SOS sent to [contact name]" on screen after dispatch
+    const targetName = contactName || contactPhone;
+    showConfirmationBanner(targetName);
     
     // Simulated reset for demo purposes
     setTimeout(() => {
