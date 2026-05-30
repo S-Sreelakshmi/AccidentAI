@@ -1,4 +1,4 @@
-# 🚨 AccidentAI — Intelligent Emergency Response Application
+# 🚨 AccidentAI : Intelligent Emergency Response Application
 
 > A mobile-first Progressive Web App that detects vehicle crashes, dispatches SOS alerts, and guides users to the nearest emergency services — all in seconds.
 
